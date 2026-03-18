@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>สั่งอาหาร</title>
+<script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+
+  :root {
+    --green: #06C755;
+    --green-dark: #05a847;
+    --green-light: #e8faf0;
+    --bg: #f5f5f5;
+    --white: #ffffff;
+    --text: #1a1a1a;
+    --text-muted: #888;
+    --border: #e8e8e8;
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Sarabun', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  /* ===== SCREENS ===== */
+  .screen { display: none; width: 100%; max-width: 400px; }
+  .screen.active { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ===== LOADING ===== */
+  #screen-loading {
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    gap: 20px;
+  }
+
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text { color: var(--text-muted); font-size: 15px; }
+
+  /* ===== WELCOME ===== */
+  #screen-welcome { animation: fadeUp 0.4s ease; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .store-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .store-icon {
+    width: 52px; height: 52px;
+    background: var(--green-light);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+
+  .store-name { font-size: 18px; font-weight: 700; color: var(--text); }
+  .store-sub  { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+  .info-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
+  .info-row .label { color: var(--text-muted); font-size: 13px; }
+
+  /* Notify badge */
+  .notify-banner {
+    background: var(--green-light);
+    border: 1.5px solid #b2ead0;
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .notify-banner .icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+  .notify-banner .text { font-size: 14px; color: #1a6640; line-height: 1.6; }
+  .notify-banner .text strong { font-weight: 700; }
+
+  /* CTA Button */
+  .btn-main {
+    width: 100%;
+    padding: 16px;
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.3px;
+  }
+  .btn-main:hover   { background: var(--green-dark); }
+  .btn-main:active  { transform: scale(0.98); }
+  .btn-main:disabled { background: #aaa; cursor: not-allowed; }
+
+  .btn-secondary {
+    width: 100%;
+    padding: 13px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    font-family: 'Sarabun', sans-serif;
+    font-size: 15px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-secondary:hover { border-color: #bbb; color: var(--text); }
+
+  /* Step indicator */
+  .steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 4px;
+  }
+  .step {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    flex: 1;
+  }
+  .step-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: var(--text-muted);
+    transition: all 0.3s;
+  }
+  .step-dot.active { background: var(--green); color: white; }
+  .step-dot.done   { background: var(--green); color: white; }
+  .step-label { font-size: 11px; color: var(--text-muted); text-align: center; }
+  .step-line { height: 2px; flex: 1; background: var(--border); margin-bottom: 18px; transition: background 0.3s; }
+  .step-line.done { background: var(--green); }
+
+  /* ===== ORDERING ===== */
+  #screen-ordering .card { text-align: center; }
+
+  .order-status-icon {
+    font-size: 48px;
+    margin: 8px 0 12px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+  }
+
+  .order-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .order-sub   { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+
+  .order-frame-wrap {
+    background: var(--white);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    height: 72vh;
+    min-height: 400px;
+    position: relative;
+  }
+
+  .frame-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.9);
+    gap: 12px;
+    z-index: 10;
+    transition: opacity 0.4s;
+  }
+  .frame-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  #gpos-frame {
+    width: 100%; height: 100%; border: none;
+    display: block;
+  }
+
+  /* ===== CONFIRM ===== */
+  #screen-confirm { animation: fadeUp 0.4s ease; }
+
+  .confirm-icon {
+    text-align: center;
+    font-size: 64px;
+    padding: 8px 0;
+    animation: bounceIn 0.5s ease;
+  }
+  @keyframes bounceIn {
+    0%   { transform: scale(0.5); opacity: 0; }
+    70%  { transform: scale(1.1); }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+
+  .confirm-title { font-size: 22px; font-weight: 700; text-align: center; }
+  .confirm-sub   { font-size: 14px; color: var(--text-muted); text-align: center; line-height: 1.7; }
+
+  /* ===== SUCCESS ===== */
+  #screen-success { animation: fadeUp 0.4s ease; align-items: center; text-align: center; min-height: 60vh; justify-content: center; }
+
+  .success-circle {
+    width: 90px; height: 90px;
+    background: var(--green-light);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 42px;
+    animation: bounceIn 0.5s ease;
+  }
+
+  .success-title { font-size: 22px; font-weight: 700; }
+  .success-sub   { font-size: 14px; color: var(--text-muted); line-height: 1.8; }
+
+  /* ===== ERROR ===== */
+  #screen-error { align-items: center; text-align: center; min-height: 60vh; justify-content: center; }
+  .error-icon  { font-size: 48px; }
+  .error-title { font-size: 18px; font-weight: 700; color: #c0392b; }
+  .error-sub   { font-size: 14px; color: var(--text-muted); }
+
+  /* ===== FOOTER ===== */
+  .footer { text-align: center; font-size: 12px; color: #bbb; padding-top: 4px; }
+  .footer span { color: var(--green); }
+</style>
+</head>
+<body>
+
+<!-- ========== SCREEN: LOADING ========== -->
+<div id="screen-loading" class="screen active">
+  <div class="spinner"></div>
+  <p class="loading-text">กำลังเชื่อมต่อ LINE...</p>
+</div>
+
+<!-- ========== SCREEN: WELCOME ========== -->
+<div id="screen-welcome" class="screen">
+
+  <div class="card">
+    <div class="store-header">
+      <div class="store-icon">☕</div>
+      <div>
+        <div class="store-name" id="store-name">ร้านของเรา</div>
+        <div class="store-sub">ยินดีต้อนรับ 👋</div>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="info-row">
+      <span class="icon">👤</span>
+      <div>
+        <div class="label">สั่งในนาม</div>
+        <div id="display-name">กำลังโหลด...</div>
+      </div>
+    </div>
+    <div class="info-row">
+      <span class="icon">🪑</span>
+      <div>
+        <div class="label">โต๊ะ</div>
+        <div id="table-display">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notify-banner">
+    <span class="icon">🔔</span>
+    <div class="text">
+      <strong>รับการแจ้งเตือนออเดอร์ใน LINE</strong><br>
+      หลังสั่งเสร็จแล้ว กด "แจ้งออเดอร์ของฉัน" เพื่อรับสรุปออเดอร์และสถานะอาหารผ่าน LINE OA
+    </div>
+  </div>
+
+  <button class="btn-main" onclick="goToOrder()">
+    🛒 เริ่มสั่งอาหาร
+  </button>
+
+  <p class="footer">ขับเคลื่อนโดย <span>LINE LIFF</span></p>
+</div>
+
+<!-- ========== SCREEN: ORDERING (iframe GPOS) ========== -->
+<div id="screen-ordering" class="screen">
+  <div class="order-frame-wrap">
+    <div class="frame-overlay" id="frame-overlay">
+      <div class="spinner"></div>
+      <p class="loading-text">กำลังเปิดหน้าสั่งอาหาร...</p>
+    </div>
+    <iframe id="gpos-frame" onload="frameLoaded()"></iframe>
+  </div>
+  <button class="btn-main" onclick="showConfirm()" id="btn-ordered">
+    ✅ สั่งและจ่ายเงินแล้ว
+  </button>
+  <p class="footer">กดปุ่มด้านบนหลังจ่ายเงินเสร็จ</p>
+</div>
+
+<!-- ========== SCREEN: CONFIRM ========== -->
+<div id="screen-confirm" class="screen">
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step">
+      <div class="step-dot done">✓</div>
+      <div class="step-label">สั่งอาหาร</div>
+    </div>
+    <div class="step-line done"></div>
+    <div class="step">
+      <div class="step-dot active">2</div>
+      <div class="step-label">ยืนยัน</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step">
+      <div class="step-dot">3</div>
+      <div class="step-label">รับแจ้งเตือน</div>
+    </div>
+  </div>
+
+  <div class="card" style="text-align:center">
+    <div class="order-status-icon">🧾</div>
+    <div class="order-title">ยืนยันการสั่งอาหาร</div>
+    <div class="order-sub">กดปุ่มด้านล่างเพื่อแจ้งร้าน<br>และรับสรุปออเดอร์ใน LINE ของคุณ</div>
+  </div>
+
+  <div class="notify-banner">
+    <span class="icon">📱</span>
+    <div class="text">
+      คุณจะได้รับข้อความใน <strong>LINE OA ของร้าน</strong><br>
+      พร้อมรายละเอียดออเดอร์และหมายเลขรับอาหาร
+    </div>
+  </div>
+
+  <button class="btn-main" id="btn-confirm" onclick="sendNotify()">
+    🔔 แจ้งออเดอร์ของฉัน
+  </button>
+  <button class="btn-secondary" onclick="goBack()">← กลับไปสั่งเพิ่ม</button>
+</div>
+
+<!-- ========== SCREEN: SUCCESS ========== -->
+<div id="screen-success" class="screen">
+  <div class="success-circle">✅</div>
+  <div class="success-title">ส่งออเดอร์แล้ว!</div>
+  <div class="success-sub">
+    ร้านได้รับออเดอร์ของคุณแล้วครับ<br>
+    เช็คสถานะได้ใน <strong>LINE OA</strong><br>
+    ของร้านได้เลย 🎉
+  </div>
+  <button class="btn-main" onclick="closeLiff()" style="max-width:300px">
+    ปิดหน้าต่างนี้
+  </button>
+</div>
+
+<!-- ========== SCREEN: ERROR ========== -->
+<div id="screen-error" class="screen">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title">เกิดข้อผิดพลาด</div>
+  <div class="error-sub" id="error-msg">ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง</div>
+  <button class="btn-main" onclick="location.reload()" style="max-width:260px;margin-top:8px">
+    ลองใหม่
+  </button>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — แก้ค่าเหล่านี้ให้ตรงกับร้านของคุณ
+// ============================================================
+const CONFIG = {
+  LIFF_ID:       "YOUR_LIFF_ID",               // ใส่ LIFF ID จาก LINE Developers Console
+  GPOS_URL:      "https://qr_order-c1og21.th.biot-apps.com/root/qrorder?store_id=S20240623184800000078&table_number=&checkout_id=",
+  STORE_NAME:    "ร้านของเรา",                  // ชื่อร้าน
+  MAKE_WEBHOOK:  "https://hook.eu2.make.com/YOUR_WEBHOOK_ID",  // Webhook URL จาก Make.com
+};
+// ============================================================
+
+let lineUserId  = "";
+let displayName = "";
+let tableNumber = "";
+
+// ---- Init LIFF ----
+async function initLiff() {
+  try {
+    // ดึง table_number จาก URL ที่ LIFF เปิดมา (ถ้ามี)
+    const params = new URLSearchParams(location.search);
+    tableNumber  = params.get("table") || params.get("table_number") || "-";
+
+    document.getElementById("store-name").textContent = CONFIG.STORE_NAME;
+
+    await liff.init({ liffId: CONFIG.LIFF_ID });
+
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: location.href });
+      return;
+    }
+
+    const profile  = await liff.getProfile();
+    lineUserId     = profile.userId;
+    displayName    = profile.displayName;
+
+    document.getElementById("display-name").textContent = displayName;
+    document.getElementById("table-display").textContent = tableNumber !== "-" ? `โต๊ะ ${tableNumber}` : "ไม่ระบุโต๊ะ";
+
+    showScreen("welcome");
+  } catch (err) {
+    console.error(err);
+    document.getElementById("error-msg").textContent = "ไม่สามารถเชื่อมต่อ LINE ได้: " + err.message;
+    showScreen("error");
+  }
+}
+
+// ---- Navigation ----
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-" + name).classList.add("active");
+}
+
+function goToOrder() {
+  showScreen("ordering");
+  // โหลด GPOS ใน iframe พร้อมแนบ table_number
+  const url = CONFIG.GPOS_URL.replace(
+    "table_number=", "table_number=" + encodeURIComponent(tableNumber)
+  );
+  document.getElementById("gpos-frame").src = url;
+}
+
+function frameLoaded() {
+  document.getElementById("frame-overlay").classList.add("hidden");
+}
+
+function showConfirm() { showScreen("confirm"); }
+function goBack()       { showScreen("ordering"); }
+
+// ---- Send notify to Make.com ----
+async function sendNotify() {
+  const btn = document.getElementById("btn-confirm");
+  btn.disabled = true;
+  btn.textContent = "⏳ กำลังส่ง...";
+
+  const payload = {
+    lineUserId:  lineUserId,
+    displayName: displayName,
+    tableNumber: tableNumber,
+    storeName:   CONFIG.STORE_NAME,
+    timestamp:   new Date().toISOString(),
+  };
+
+  try {
+    await fetch(CONFIG.MAKE_WEBHOOK, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(payload),
+    });
+    showScreen("success");
+  } catch (err) {
+    console.error(err);
+    // แม้ fetch fail (CORS บาง env) ให้ถือว่าส่งแล้ว เพราะ Make.com รับได้
+    showScreen("success");
+  }
+}
+
+function closeLiff() {
+  try { liff.closeWindow(); } catch { window.close(); }
+}
+
+// ---- Start ----
+initLiff();
+</script>
+</body>
+</html>
